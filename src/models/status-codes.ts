@@ -1,0 +1,8 @@
+export enum STATUS_CODES {
+    SUCCESS = 200,
+    CREATED = 201,
+    DELETED = 204,
+    INVALID = 400,
+    DOES_NOT_EXIST = 404,
+    SERVER_ERROR = 500
+}

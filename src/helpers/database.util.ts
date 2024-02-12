@@ -36,9 +36,12 @@ export async function getUserById(userId: string): Promise<string> {
         return Promise.reject('not uuid');
     }
     return getUsers().then((userData: string) => {
-        const foundData: string = Array.from(userData).find((data: string) => {
-            const userDataModel: UserModel = JSON.parse(data);
-            return userDataModel.id === userId
+        let currentDB = [];
+        if (userData) {
+            currentDB = JSON.parse(userData);
+        }
+        const foundData: string = currentDB.find((data: UserModel) => {
+            return data.id === userId
         }) as string;
         return Boolean(foundData) ? Promise.resolve(foundData) : Promise.reject('not exist');
     });
@@ -52,17 +55,20 @@ export async function saveUser(userDataStr: string): Promise<void> {
 
     return new Promise((resolve, reject) => {
         return getUsers().then((users: string) => {
+            let currentDB = [];
             const dbPath = path.resolve(__dirname, 'storage');
             const newUserData = {
                 ...userData,
                 id: uuidv4()
             };
-            const currentDB = JSON.parse(users);
+            if (users) {
+                currentDB = JSON.parse(users);
+            }
             const newDB = JSON.stringify([...currentDB, newUserData]);
             const writebleStream = fs.createWriteStream(`${dbPath}/storage.json`);
             writebleStream.write(Buffer.from(newDB));
             writebleStream.close();
-    
+
             writebleStream.on('close', () => {
                 resolve();
             });
@@ -78,10 +84,14 @@ export async function updateUser(userId: string, newData: string): Promise<void>
     }
     return getUsers().then((userData: string) => {
         return new Promise(async (resolve, reject) => {
+            let currentDB = [];
+            if (userData) {
+                currentDB = JSON.parse(userData);
+            }
             const newArray: UserModel[] = [];
             const newDataModel = JSON.parse(newData);
             let dataIsUpdated: boolean = false;
-            JSON.parse(userData).forEach((data: UserModel) => {
+            JSON.parse(currentDB).forEach((data: UserModel) => {
                 if (data.id === userId) {
                     newArray.push({
                         ...data,
@@ -118,7 +128,7 @@ export async function deleteUser(userId: string): Promise<void> {
             const newArray: UserModel[] = [];
             const currentArray: UserModel[] = JSON.parse(userData);
             currentArray.forEach((data: UserModel) => {
-                if(data.id !== userId) {
+                if (data.id !== userId) {
                     newArray.push(data);
                 }
             });
@@ -126,7 +136,7 @@ export async function deleteUser(userId: string): Promise<void> {
             if (currentArray.length === newArray.length) {
                 return reject('not exist');
             }
-            
+
             const dbPath = path.resolve(__dirname, 'storage/storage.json');
             await fs.promises.rm(dbPath);
             const writebleStream = fs.createWriteStream(`${dbPath}`);

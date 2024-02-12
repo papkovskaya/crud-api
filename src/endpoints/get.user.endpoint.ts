@@ -4,8 +4,9 @@ import { STATUS_CODES } from "../models/status-codes";
 
 export async function getUser(_: IncomingMessage, response: ServerResponse, id: string): Promise<void> {
     await database.getUserById(id).then((usersData: string) => {
+        console.log('ddddd');
         response.statusCode = STATUS_CODES.SUCCESS;
-        response.end(usersData);
+        response.end(JSON.stringify(usersData));
     }).catch((error) => {
         if (error === 'not uuid') {
             response.statusCode = STATUS_CODES.INVALID;

@@ -1,6 +1,7 @@
 import fs from 'fs';
-import { UserModel } from 'models/user.model';
+import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import path from 'path';
+import { UserModel } from 'models/user.model';
 
 export async function createDatabase(): Promise<void> {
     const dbPath = path.resolve(__dirname, 'storage');
@@ -31,50 +32,73 @@ export async function getUsers(): Promise<string> {
     })
 }
 export async function getUserById(userId: string): Promise<string> {
+    if (!uuidValidate(userId)) {
+        return Promise.reject('not uuid');
+    }
     return getUsers().then((userData: string) => {
         const foundData: string = Array.from(userData).find((data: string) => {
             const userDataModel: UserModel = JSON.parse(data);
             return userDataModel.id === userId
         }) as string;
-        return Boolean(foundData) ? Promise.resolve(foundData) : Promise.reject('error');
+        return Boolean(foundData) ? Promise.resolve(foundData) : Promise.reject('not exist');
     });
 }
-export async function saveUser(userData: UserModel): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const dbPath = path.resolve(__dirname, 'storage');
-        const userDataString = JSON.stringify(userData);
-        const writebleStream = fs.createWriteStream(`${dbPath}/storage.json`);
-        writebleStream.write(Buffer.from(userDataString));
-        writebleStream.close();
+export async function saveUser(userDataStr: string): Promise<void> {
+    const userData = JSON.parse(userDataStr);
 
-        writebleStream.on('close', () => {
-            resolve();
-        });
-        writebleStream.on('error', () => {
-            reject('error');
+    if (!userData || !userData.age || !userData.username || !Array.isArray(userData.hobbies)) {
+        return Promise.reject('not valid');
+    }
+
+    return new Promise((resolve, reject) => {
+        return getUsers().then((users: string) => {
+            const dbPath = path.resolve(__dirname, 'storage');
+            const newUserData = {
+                ...userData,
+                id: uuidv4()
+            };
+            const currentDB = JSON.parse(users);
+            const newDB = JSON.stringify([...currentDB, newUserData]);
+            const writebleStream = fs.createWriteStream(`${dbPath}/storage.json`);
+            writebleStream.write(Buffer.from(newDB));
+            writebleStream.close();
+    
+            writebleStream.on('close', () => {
+                resolve();
+            });
+            writebleStream.on('error', () => {
+                reject('error');
+            })
         })
     });
 }
 export async function updateUser(userId: string, newData: string): Promise<void> {
+    if (!uuidValidate(userId)) {
+        return Promise.reject('not uuid');
+    }
     return getUsers().then((userData: string) => {
         return new Promise(async (resolve, reject) => {
             const newArray: UserModel[] = [];
             const newDataModel = JSON.parse(newData);
-            Array.from(userData).forEach((data: string) => {
-                const userDataModel: UserModel = JSON.parse(data);
-                if (userDataModel.id === userId) {
+            let dataIsUpdated: boolean = false;
+            JSON.parse(userData).forEach((data: UserModel) => {
+                if (data.id === userId) {
                     newArray.push({
-                        ...userDataModel,
+                        ...data,
                         ...newDataModel
-                    })
+                    });
+                    dataIsUpdated = true;
                 } else {
-                    newArray.push(userDataModel)
+                    newArray.push(data)
                 }
             });
+            if (!dataIsUpdated) {
+                return reject('not exist');
+            }
             const dbPath = path.resolve(__dirname, 'storage/storage.json');
             await fs.promises.rm(dbPath);
             const writebleStream = fs.createWriteStream(`${dbPath}`);
-            writebleStream.write(Buffer.from(newArray.toString()));
+            writebleStream.write(Buffer.from(JSON.stringify(newArray)));
             writebleStream.close();
             writebleStream.on('close', () => {
                 resolve();
@@ -86,19 +110,27 @@ export async function updateUser(userId: string, newData: string): Promise<void>
     });
 }
 export async function deleteUser(userId: string): Promise<void> {
+    if (!uuidValidate(userId)) {
+        return Promise.reject('not uuid');
+    }
     return getUsers().then((userData: string) => {
         return new Promise(async (resolve, reject) => {
             const newArray: UserModel[] = [];
-            Array.from(userData).forEach((data: string) => {
-                const userDataModel: UserModel = JSON.parse(data);
-                if(userDataModel.id !== userId) {
-                    newArray.push(userDataModel);
+            const currentArray: UserModel[] = JSON.parse(userData);
+            currentArray.forEach((data: UserModel) => {
+                if(data.id !== userId) {
+                    newArray.push(data);
                 }
             });
+
+            if (currentArray.length === newArray.length) {
+                return reject('not exist');
+            }
+            
             const dbPath = path.resolve(__dirname, 'storage/storage.json');
             await fs.promises.rm(dbPath);
             const writebleStream = fs.createWriteStream(`${dbPath}`);
-            writebleStream.write(Buffer.from(newArray.toString()));
+            writebleStream.write(Buffer.from(JSON.stringify(newArray)));
             writebleStream.close();
             writebleStream.on('close', () => {
                 resolve();
